@@ -10,6 +10,8 @@ import { ZodError } from 'zod';
 
 import { menuRoutes } from './routes/menu.routes.js';
 import { adminMenuRoutes } from './routes/admin.menu.routes.js';
+import { orderRoutes } from './routes/order.routes.js';
+import { adminAnalyticsRoutes } from './routes/admin.analytics.routes.js';
 
 export function buildApp(): FastifyInstance {
   const app = fastify({
@@ -87,6 +89,14 @@ export function buildApp(): FastifyInstance {
   // Register Admin Menu routes
   app.register(adminMenuRoutes);
   app.register(adminMenuRoutes, { prefix: '/api' });
+
+  // Register Order routes
+  app.register(orderRoutes);
+  app.register(orderRoutes, { prefix: '/api' });
+
+  // Register Admin Analytics routes
+  app.register(adminAnalyticsRoutes);
+  app.register(adminAnalyticsRoutes, { prefix: '/api' });
 
   return app;
 }
