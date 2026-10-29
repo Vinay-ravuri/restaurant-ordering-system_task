@@ -12,6 +12,7 @@ import { menuRoutes } from './routes/menu.routes.js';
 import { adminMenuRoutes } from './routes/admin.menu.routes.js';
 import { orderRoutes } from './routes/order.routes.js';
 import { adminAnalyticsRoutes } from './routes/admin.analytics.routes.js';
+import { sseRoutes } from './routes/sse.routes.js';
 
 export function buildApp(): FastifyInstance {
   const app = fastify({
@@ -97,6 +98,10 @@ export function buildApp(): FastifyInstance {
   // Register Admin Analytics routes
   app.register(adminAnalyticsRoutes);
   app.register(adminAnalyticsRoutes, { prefix: '/api' });
+
+  // Register SSE routes
+  app.register(sseRoutes);
+  app.register(sseRoutes, { prefix: '/api' });
 
   return app;
 }
