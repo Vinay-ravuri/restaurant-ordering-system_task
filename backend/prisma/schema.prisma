@@ -1,0 +1,124 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  ADMIN
+  KITCHEN
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+}
+
+enum OrderStatus {
+  RECEIVED
+  PREPARING
+  READY
+  SERVED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  name         String?
+  passwordHash String
+  role         Role     @default(KITCHEN)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@map("users")
+}
+
+model Category {
+  id          String     @id @default(uuid())
+  name        String
+  sortOrder   Int        @default(0)
+  description String?
+  isActive    Boolean    @default(true)
+  items       MenuItem[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@map("categories")
+}
+
+model MenuItem {
+  id          String        @id @default(uuid())
+  categoryId  String
+  category    Category      @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name        String
+  description String
+  imageUrl    String?
+  isAvailable Boolean       @default(true)
+  dietary     String?
+  variants    ItemVariant[]
+  orderItems  OrderItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([categoryId])
+  @@index([isAvailable])
+  @@map("menu_items")
+}
+
+model ItemVariant {
+  id          String      @id @default(uuid())
+  itemId      String      @map("menu_item_id")
+  item        MenuItem    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  label       String
+  pricePaise  Int
+  isAvailable Boolean     @default(true)
+  orderItems  OrderItem[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([itemId])
+  @@map("item_variants")
+}
+
+model Order {
+  id             String       @id @default(uuid())
+  orderNumber    String?
+  orderType      OrderType
+  tableNumber    Int?
+  customerName   String?
+  status         OrderStatus  @default(RECEIVED)
+  totalPaise     Int
+  idempotencyKey String?      @unique
+  items          OrderItem[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  preparingAt    DateTime?
+  readyAt        DateTime?
+  servedAt       DateTime?
+
+  @@index([createdAt])
+  @@index([status])
+  @@map("orders")
+}
+
+model OrderItem {
+  id                   String       @id @default(uuid())
+  orderId              String
+  order                Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  itemId               String?
+  item                 MenuItem?    @relation(fields: [itemId], references: [id], onDelete: SetNull)
+  variantId            String?
+  variant              ItemVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  nameSnapshot         String
+  variantLabelSnapshot String
+  unitPricePaise       Int
+  qty                  Int
+  lineTotalPaise       Int
+
+  @@index([orderId])
+  @@map("order_items")
+}

@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: |
+          npm install
+          npm --prefix backend install
+          npm --prefix frontend install
+
+      - name: Type check backend
+        run: npm --prefix backend run typecheck
+
+      - name: Type check frontend
+        run: npm --prefix frontend run typecheck
+
+      - name: Run Backend Tests
+        run: npm --prefix backend test
+
+      - name: Build
+        run: |
+          npm --prefix backend run build
+          npm --prefix frontend run build
