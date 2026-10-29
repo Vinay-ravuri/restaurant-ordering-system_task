@@ -6,7 +6,7 @@ dotenv.config();
 const envSchema = z.object({
   PORT: z.coerce.number().default(4000),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  DATABASE_URL: z.string().min(1, 'DATABASE_URL is required'),
+  DATABASE_URL: z.string().default('postgresql://postgres:postgres@localhost:5432/restaurantos?schema=public'),
   DIRECT_URL: z.string().optional(),
   JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters').default('restaurantos_dev_super_secret_jwt_key_at_least_32_characters_long'),
   FRONTEND_ORIGIN: z.string().default('http://localhost:5173'),
