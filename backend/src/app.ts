@@ -8,6 +8,9 @@ import { authRoutes } from './routes/auth.routes.js';
 import { formatZodError, AppError } from './utils/errors.js';
 import { ZodError } from 'zod';
 
+import { menuRoutes } from './routes/menu.routes.js';
+import { adminMenuRoutes } from './routes/admin.menu.routes.js';
+
 export function buildApp(): FastifyInstance {
   const app = fastify({
     logger: env.NODE_ENV !== 'test',
@@ -76,6 +79,14 @@ export function buildApp(): FastifyInstance {
   // Register Auth routes under /auth and /api/auth
   app.register(authRoutes, { prefix: '/auth' });
   app.register(authRoutes, { prefix: '/api/auth' });
+
+  // Register Menu routes (both root and /api prefixed)
+  app.register(menuRoutes);
+  app.register(menuRoutes, { prefix: '/api' });
+
+  // Register Admin Menu routes
+  app.register(adminMenuRoutes);
+  app.register(adminMenuRoutes, { prefix: '/api' });
 
   return app;
 }
