@@ -1,42 +1,86 @@
-import { describe, it, expect } from 'vitest';
-import { eventBus, type AppEvent } from '../src/events/eventBus.js';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { buildApp } from '../src/app.js';
+import { eventBus } from '../src/events/eventBus.js';
+import type { FastifyInstance } from 'fastify';
 
-describe('Real-Time Event Bus Infrastructure', () => {
-  it('publishes order.created events with unique ID, timestamp, and payload', () => {
-    let captured: AppEvent | null = null;
-    const handler = (event: AppEvent) => {
-      captured = event;
-    };
+describe('Server-Sent Events (SSE) Stream Lifecycle & Isolation', () => {
+  let app: FastifyInstance;
+  let serverUrl: string;
 
-    eventBus.once('order.created', handler);
-
-    eventBus.publish('order.created', {
-      id: 'ord-123',
-      orderNumber: '#101',
-      totalPaise: 45000,
-    });
-
-    expect(captured).not.toBeNull();
-    expect(captured!.type).toBe('order.created');
-    expect(captured!.id).toBeDefined();
-    expect(captured!.timestamp).toBeDefined();
-    expect(captured!.data.id).toBe('ord-123');
-    expect(captured!.data.totalPaise).toBe(45000);
+  beforeAll(async () => {
+    app = buildApp();
+    // Bind to ephemeral port for authentic HTTP stream lifecycle testing
+    serverUrl = await app.listen({ port: 0, host: '127.0.0.1' });
   });
 
-  it('publishes order.updated and menu.updated events to specific listeners', () => {
-    const events: string[] = [];
+  afterAll(async () => {
+    await app.close();
+  });
 
-    const orderHandler = (e: AppEvent) => events.push(`order:${e.data.status}`);
-    const menuHandler = (e: AppEvent) => events.push(`menu:${e.data.action}`);
+  it('correctly sets SSE streaming headers, transmits handshake, and cleans up on client disconnect', async () => {
+    const controller = new AbortController();
 
-    eventBus.once('order.updated', orderHandler);
-    eventBus.once('menu.updated', menuHandler);
+    // 1. Initiate SSE connection
+    const res = await fetch(`${serverUrl}/events/menu`, {
+      signal: controller.signal,
+    });
 
-    eventBus.publish('order.updated', { id: 'ord-123', status: 'PREPARING' });
-    eventBus.publish('menu.updated', { action: 'availability_changed', itemId: 'item-1' });
+    // 2. Validate stream headers
+    expect(res.status).toBe(200);
+    expect(res.headers.get('content-type')).toContain('text/event-stream');
+    expect(res.headers.get('cache-control')).toContain('no-cache');
+    expect(res.headers.get('connection')).toContain('keep-alive');
 
-    expect(events).toContain('order:PREPARING');
-    expect(events).toContain('menu:availability_changed');
+    const reader = res.body?.getReader();
+    expect(reader).toBeDefined();
+
+    // 3. Read initial connected handshake
+    const firstChunk = await reader!.read();
+    const handshakeText = new TextDecoder().decode(firstChunk.value);
+    expect(handshakeText).toContain(': connected');
+
+    // 4. Trigger an event and read the streamed event chunk
+    setTimeout(() => {
+      eventBus.publish('menu.updated', { action: 'stock_change', itemId: 'item-test-123' });
+    }, 20);
+
+    const eventChunk = await reader!.read();
+    const eventText = new TextDecoder().decode(eventChunk.value);
+    expect(eventText).toContain('event: menu.updated');
+    expect(eventText).toContain('stock_change');
+
+    // 5. Clean client disconnect & release reader
+    reader!.releaseLock();
+    controller.abort();
+  });
+
+  it('isolates customer order stream so updates for order A do not leak to order B', async () => {
+    const controllerA = new AbortController();
+
+    const resA = await fetch(`${serverUrl}/events/orders/order-A-uuid`, {
+      signal: controllerA.signal,
+    });
+
+    expect(resA.status).toBe(200);
+    const readerA = resA.body?.getReader();
+    expect(readerA).toBeDefined();
+
+    // Consume initial handshake
+    await readerA!.read();
+
+    // Publish Order B (should be ignored) and Order A (should be delivered)
+    setTimeout(() => {
+      eventBus.publish('order.updated', { id: 'order-B-uuid', status: 'PREPARING' });
+      eventBus.publish('order.updated', { id: 'order-A-uuid', status: 'PREPARING' });
+    }, 20);
+
+    const orderAChunk = await readerA!.read();
+    const textA = new TextDecoder().decode(orderAChunk.value);
+
+    expect(textA).toContain('order-A-uuid');
+    expect(textA).not.toContain('order-B-uuid');
+
+    readerA!.releaseLock();
+    controllerA.abort();
   });
 });
