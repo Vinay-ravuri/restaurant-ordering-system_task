@@ -5,18 +5,23 @@
 @layer base {
   :root {
     --color-bg: #F8F6F1;
-    --color-fg: #20211F;
+    --color-fg: #1F2022;
     --color-primary: #C65D3B;
   }
 
   * {
-    border-color: #E4DFD5;
+    border-color: #E6E1D7;
   }
 
   body {
     background-color: #F8F6F1;
-    color: #20211F;
+    color: #1F2022;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    /* Ambient subtle warm culinary luxury background */
+    background-image: 
+      radial-gradient(at 100% 0%, rgba(198, 93, 59, 0.035) 0px, transparent 40%),
+      radial-gradient(at 0% 100%, rgba(217, 119, 6, 0.03) 0px, transparent 40%);
+    background-attachment: fixed;
   }
 
   .font-tabular {
@@ -43,6 +48,70 @@
   }
 }
 
+/* Enterprise Glassmorphism & Visual Effects */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.glass-dark {
+  background: rgba(18, 20, 24, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.glass-hero {
+  background: linear-gradient(180deg, rgba(17, 19, 24, 0.55) 0%, rgba(17, 19, 24, 0.85) 100%);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Subtle dot-pattern background for enterprise operational views */
+.bg-subtle-dots {
+  background-image: radial-gradient(rgba(32, 33, 31, 0.08) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.bg-dark-grid {
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+/* Shimmer animation for image loading */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-loading {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-loading::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.2) 20%,
+    rgba(255, 255, 255, 0.5) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 1.8s infinite;
+  content: '';
+}
+
 @keyframes pulse-subtle {
   0%, 100% {
     opacity: 1;
@@ -56,4 +125,13 @@
 
 .animate-pulse-subtle {
   animation: pulse-subtle 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Smooth hide scrollbar */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

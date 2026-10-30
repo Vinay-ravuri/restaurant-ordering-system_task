@@ -1,19 +1,32 @@
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Clock, CheckCircle2, Utensils, ArrowLeft, RefreshCw, AlertCircle } from 'lucide-react';
+import { 
+  Clock, 
+  CheckCircle2, 
+  Utensils, 
+  ArrowLeft, 
+  RefreshCw, 
+  AlertCircle, 
+  ChefHat, 
+  Sparkles,
+  ShoppingBag,
+  Flame,
+  Check
+} from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useEventSource } from '../hooks/useEventSource.js';
 import { formatPaise, formatTimeAgo } from '../lib/utils.js';
 import { Badge } from '../components/ui/Badge.js';
 import { Button } from '../components/ui/Button.js';
+import { PAGE_BACKGROUNDS, getDishImageUrl } from '../lib/dishImages.js';
 import type { OrderStatus } from '../types/index.js';
 
-const STATUS_STEPS: Array<{ key: OrderStatus; label: string; desc: string }> = [
-  { key: 'RECEIVED', label: 'Order Received', desc: 'Sent to kitchen for preparation' },
-  { key: 'PREPARING', label: 'Preparing', desc: 'Our chefs are actively cooking' },
-  { key: 'READY', label: 'Ready', desc: 'Plated and ready for pickup' },
-  { key: 'SERVED', label: 'Served', desc: 'Completed and enjoyed' },
+const STATUS_STEPS: Array<{ key: OrderStatus; label: string; desc: string; icon: string }> = [
+  { key: 'RECEIVED', label: 'Order Received', desc: 'Verified and queued in master kitchen', icon: '📝' },
+  { key: 'PREPARING', label: 'In Kitchen Preparation', desc: 'Chefs actively firing & plating your order', icon: '🔥' },
+  { key: 'READY', label: 'Ready for Service', desc: 'Plated hot, ready for table or pickup counter', icon: '🍽️' },
+  { key: 'SERVED', label: 'Completed & Served', desc: 'Order delivered and ready to enjoy', icon: '✨' },
 ];
 
 export function OrderTrackingPage() {
@@ -47,25 +60,28 @@ export function OrderTrackingPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen max-w-xl mx-auto px-4 py-16 text-center space-y-4">
-        <RefreshCw className="w-8 h-8 text-primary animate-spin mx-auto" />
-        <p className="text-sm font-semibold text-muted">Retrieving order status...</p>
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-16 h-16 rounded-3xl bg-primary/10 text-primary flex items-center justify-center animate-spin mb-4">
+          <RefreshCw className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold font-serif text-foreground">Loading Your Order Status...</h2>
+        <p className="text-xs text-muted mt-1.5">Connecting to real-time dining stream</p>
       </div>
     );
   }
 
   if (error || !order) {
     return (
-      <div className="min-h-screen max-w-md mx-auto px-4 py-16 text-center">
-        <div className="w-14 h-14 rounded-2xl bg-red-50 text-danger flex items-center justify-center mx-auto mb-4 border border-red-200">
-          <AlertCircle className="w-7 h-7" />
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-md mx-auto">
+        <div className="w-16 h-16 rounded-3xl bg-red-50 text-danger flex items-center justify-center mb-4 border border-red-200">
+          <AlertCircle className="w-8 h-8" />
         </div>
-        <h2 className="text-xl font-bold font-serif text-foreground">Order Not Found</h2>
-        <p className="text-xs text-muted mt-2">
-          We could not locate this order. Please verify your order link or place a new order.
+        <h2 className="text-2xl font-bold font-serif text-foreground">Order Not Found</h2>
+        <p className="text-xs text-muted mt-2 leading-relaxed">
+          We could not locate this order receipt. Please check your link or browse our menu to place an order.
         </p>
-        <Link to="/" className="inline-block mt-6">
-          <Button variant="primary">Return to Menu</Button>
+        <Link to="/" className="mt-6 inline-block">
+          <Button variant="primary" className="rounded-2xl">Return to Menu</Button>
         </Link>
       </div>
     );
@@ -74,134 +90,206 @@ export function OrderTrackingPage() {
   const currentStepIndex = STATUS_STEPS.findIndex((s) => s.key === order.status);
 
   return (
-    <div className="min-h-screen pb-20">
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        {/* Navigation back */}
-        <Link
-          to="/"
-          className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted hover:text-foreground mb-6 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to Menu</span>
-        </Link>
+    <div className="min-h-screen pb-24">
+      {/* Cinematic Hero Header with Food Background */}
+      <section className="relative overflow-hidden bg-stone-950 text-white py-12 sm:py-16 px-4 sm:px-6 border-b border-stone-800">
+        <div 
+          className="absolute inset-0 bg-cover bg-center opacity-30 scale-105"
+          style={{ backgroundImage: `url(${PAGE_BACKGROUNDS.orderTrackingHero})` }}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-stone-950 via-stone-950/75 to-stone-950/50" />
 
-        {/* Order Card Container */}
-        <div className="bg-card rounded-3xl border border-border p-6 shadow-soft text-left">
-          {/* Header */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pb-6 border-b border-border">
+        <div className="relative max-w-4xl mx-auto z-10 text-left">
+          {/* Back button */}
+          <Link
+            to="/"
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-stone-300 hover:text-white mb-4 transition-colors px-3 py-1.5 rounded-xl bg-white/10 backdrop-blur-md border border-white/10"
+          >
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>Back to Menu</span>
+          </Link>
+
+          <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl font-bold font-serif text-foreground tracking-tight">
-                  Order {order.orderNumber || `#${order.id.slice(0, 6)}`}
-                </h1>
-                <Badge orderType={order.orderType} />
+              <div className="flex items-center gap-2.5">
+                <span className="text-xs font-bold tracking-widest text-amber-400 uppercase">
+                  Live Order Tracker
+                </span>
+                <span className="text-stone-500">·</span>
+                <div className="flex items-center gap-1 text-xs text-stone-300">
+                  <span className={`w-2 h-2 rounded-full ${sseStatus === 'connected' ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                  <span>{sseStatus === 'connected' ? 'Live Stream Connected' : 'Syncing...'}</span>
+                </div>
               </div>
-              <p className="text-xs text-muted mt-1">
-                Placed {formatTimeAgo(order.createdAt)}
-                {order.customerName ? ` for ${order.customerName}` : ''}
-                {order.tableNumber ? ` · Table #${order.tableNumber}` : ''}
+              <h1 className="text-3xl sm:text-4xl font-serif font-bold text-white mt-1 tracking-tight">
+                Order {order.orderNumber || `#${order.id.slice(0, 6).toUpperCase()}`}
+              </h1>
+              <p className="text-xs text-stone-300 mt-1">
+                Placed {formatTimeAgo(order.createdAt)} · {order.orderType === 'DINE_IN' ? `Table ${order.tableNumber || '-'}` : 'Takeaway Order'}
               </p>
             </div>
 
-            {/* Live SSE status indicator */}
-            <div className="flex items-center gap-2 text-xs">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  sseStatus === 'connected'
-                    ? 'bg-emerald-500 animate-pulse'
-                    : sseStatus === 'connecting'
-                    ? 'bg-amber-500'
-                    : 'bg-stone-400'
-                }`}
-              />
-              <span className="text-muted font-medium">
-                {sseStatus === 'connected' ? 'Live Updates Active' : 'Connecting...'}
-              </span>
+            <div className="flex items-center gap-2">
+              <Badge status={order.status} className="text-sm py-1.5 px-3.5 rounded-xl shadow-soft" />
+              <Badge orderType={order.orderType} className="text-sm py-1.5 px-3 rounded-xl" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Main Content Area */}
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 mt-8 space-y-6">
+        {/* Visual Progress Steps Tracker Card */}
+        <div className="bg-card rounded-3xl border border-border p-6 sm:p-8 shadow-soft text-left">
+          <div className="flex items-center justify-between mb-6 pb-4 border-b border-border">
+            <div>
+              <h2 className="text-lg font-bold font-serif text-foreground">Preparation Timeline</h2>
+              <p className="text-xs text-muted mt-0.5">Automated kitchen status synchronization</p>
+            </div>
+            <div className="text-right">
+              <span className="text-xs font-bold text-primary">Stage {currentStepIndex + 1} of 4</span>
             </div>
           </div>
 
-          {/* Ready Banner */}
-          {order.status === 'READY' && (
-            <div className="my-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-3 text-emerald-900">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
+          {/* Progress Bar & Steps */}
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 relative">
+            {STATUS_STEPS.map((step, index) => {
+              const isDone = index < currentStepIndex;
+              const isCurrent = index === currentStepIndex;
+
+              return (
+                <div
+                  key={step.key}
+                  className={`relative p-4 rounded-2xl border transition-all ${
+                    isCurrent
+                      ? 'bg-primary-light/60 border-primary/40 shadow-sm'
+                      : isDone
+                      ? 'bg-secondary/60 border-border'
+                      : 'bg-card/40 border-border/60 opacity-60'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-2xl">{step.icon}</span>
+                    {isDone ? (
+                      <span className="w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-xs">
+                        <Check className="w-3 h-3" />
+                      </span>
+                    ) : isCurrent ? (
+                      <span className="w-2.5 h-2.5 rounded-full bg-primary animate-ping" />
+                    ) : (
+                      <span className="w-2 h-2 rounded-full bg-stone-300" />
+                    )}
+                  </div>
+                  <h3 className={`text-xs font-bold ${isCurrent ? 'text-primary' : 'text-foreground'}`}>
+                    {step.label}
+                  </h3>
+                  <p className="text-[11px] text-muted mt-1 leading-normal">
+                    {step.desc}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Itemized Order Receipt Card */}
+        <div className="bg-card rounded-3xl border border-border overflow-hidden shadow-soft text-left">
+          <div className="p-6 sm:p-8 border-b border-border bg-secondary/30">
+            <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-bold">Your order is Ready!</p>
-                <p className="text-xs text-emerald-700 mt-0.5">
-                  {order.orderType === 'DINE_IN'
-                    ? `Staff is bringing your dishes to Table #${order.tableNumber}.`
-                    : 'Your takeaway parcel is ready at the counter.'}
-                </p>
+                <span className="text-[11px] font-bold text-muted uppercase tracking-wider block">
+                  Digital Guest Check
+                </span>
+                <h3 className="text-xl font-bold font-serif text-foreground mt-0.5">
+                  Ordered Dishes & Items
+                </h3>
+              </div>
+              <div className="flex items-center gap-2">
+                {order.customerName && (
+                  <span className="text-xs font-medium text-foreground bg-card px-3 py-1 rounded-xl border border-border">
+                    Guest: <span className="font-bold">{order.customerName}</span>
+                  </span>
+                )}
+                {order.tableNumber && (
+                  <span className="text-xs font-bold text-foreground bg-card px-3 py-1 rounded-xl border border-border">
+                    Table #{order.tableNumber}
+                  </span>
+                )}
               </div>
             </div>
-          )}
-
-          {/* Status Timeline Stepper */}
-          <div className="my-8">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted mb-4">
-              Preparation Progress
-            </h2>
-            <div className="grid grid-cols-4 gap-2 relative">
-              {STATUS_STEPS.map((step, idx) => {
-                const isPassed = idx <= currentStepIndex;
-                const isCurrent = idx === currentStepIndex;
-
-                return (
-                  <div key={step.key} className="text-center flex flex-col items-center">
-                    <div
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300 ${
-                        isCurrent
-                          ? 'bg-primary text-white ring-4 ring-primary/20 scale-110 shadow-md'
-                          : isPassed
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-secondary text-muted'
-                      }`}
-                    >
-                      {isPassed && !isCurrent ? <CheckCircle2 className="w-4 h-4" /> : idx + 1}
-                    </div>
-                    <span
-                      className={`text-xs mt-2 block font-semibold ${
-                        isCurrent ? 'text-primary' : isPassed ? 'text-foreground' : 'text-muted'
-                      }`}
-                    >
-                      {step.label}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
           </div>
 
-          {/* Items Summary */}
-          <div className="pt-6 border-t border-border">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted mb-3">
-              Items Ordered
-            </h2>
-            <div className="space-y-3">
-              {order.items.map((item) => (
-                <div key={item.id} className="flex items-center justify-between text-sm py-1">
-                  <div>
-                    <span className="font-semibold text-foreground">{item.nameSnapshot}</span>
-                    <span className="ml-2 text-xs font-medium text-muted bg-secondary px-2 py-0.5 rounded">
-                      {item.variantLabelSnapshot} × {item.qty}
+          {/* Items List */}
+          <div className="p-6 sm:p-8 divide-y divide-border">
+            {order.items.map((line) => {
+              const dishThumb = getDishImageUrl({ name: line.nameSnapshot });
+
+              return (
+                <div key={line.id} className="py-4 first:pt-0 last:pb-0 flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3.5">
+                    <img
+                      src={dishThumb}
+                      alt={line.nameSnapshot}
+                      className="w-14 h-14 rounded-2xl object-cover shrink-0 border border-border shadow-sm"
+                    />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-bold text-foreground leading-snug">
+                          {line.nameSnapshot}
+                        </span>
+                        <span className="text-xs font-bold text-primary bg-primary-light px-2 py-0.5 rounded-md">
+                          ×{line.qty}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted mt-0.5 flex items-center gap-2">
+                        <span>{line.variantLabelSnapshot}</span>
+                        <span>·</span>
+                        <span className="font-tabular">{formatPaise(line.unitPricePaise)} each</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-right font-tabular">
+                    <span className="text-sm font-bold text-foreground">
+                      {formatPaise(line.lineTotalPaise)}
                     </span>
                   </div>
-                  <span className="font-tabular font-semibold text-foreground">
-                    {formatPaise(item.lineTotalPaise)}
-                  </span>
                 </div>
-              ))}
-            </div>
+              );
+            })}
+          </div>
 
-            {/* Total */}
-            <div className="mt-5 pt-4 border-t border-border flex items-center justify-between">
-              <span className="text-sm font-bold text-foreground">Amount Paid</span>
-              <span className="text-xl font-bold font-tabular text-foreground">
+          {/* Pricing Summary Footer */}
+          <div className="p-6 sm:p-8 bg-secondary/40 border-t border-border space-y-2">
+            <div className="flex justify-between text-xs text-muted">
+              <span>Item Subtotal</span>
+              <span className="font-tabular text-foreground font-semibold">
+                {formatPaise(order.totalPaise)}
+              </span>
+            </div>
+            <div className="flex justify-between text-xs text-muted">
+              <span>Applicable GST / Taxes</span>
+              <span className="text-emerald-700 font-medium">Included in Menu Price</span>
+            </div>
+            <div className="pt-3 border-t border-border flex justify-between items-baseline">
+              <span className="text-base font-bold text-foreground font-serif">Total Bill Paid</span>
+              <span className="text-2xl font-bold font-tabular text-foreground font-serif">
                 {formatPaise(order.totalPaise)}
               </span>
             </div>
           </div>
         </div>
-      </div>
+
+        {/* Action Button */}
+        <div className="text-center pt-2">
+          <Link to="/">
+            <Button variant="outline" size="lg" className="rounded-2xl gap-2 font-bold shadow-soft">
+              <ShoppingBag className="w-4 h-4 text-primary" />
+              <span>Browse Full Menu & Order More</span>
+            </Button>
+          </Link>
+        </div>
+      </main>
     </div>
   );
 }

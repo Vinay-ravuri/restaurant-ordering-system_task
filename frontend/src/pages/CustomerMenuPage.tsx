@@ -1,22 +1,41 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Search, ShoppingBag, Plus, Minus, Check, AlertTriangle } from 'lucide-react';
+import { 
+  Search, 
+  ShoppingBag, 
+  Plus, 
+  Minus, 
+  Check, 
+  AlertTriangle, 
+  ArrowRight,
+  Flame, 
+  UtensilsCrossed, 
+  Layers, 
+  Sparkles, 
+  Coffee,
+  ChevronDown,
+  LayoutGrid
+} from 'lucide-react';
 import { api } from '../lib/api.js';
 import { useCart } from '../hooks/useCart.js';
 import { useEventSource } from '../hooks/useEventSource.js';
 import { formatPaise } from '../lib/utils.js';
-import { Badge } from '../components/ui/Badge.js';
-import { Button } from '../components/ui/Button.js';
+import { PAGE_BACKGROUNDS, getDishImageUrl } from '../lib/dishImages.js';
 import type { MenuItem, ItemVariant } from '../types/index.js';
 
 export function CustomerMenuPage() {
   const { addItem, items: cartLines, totalItems, totalPaise, setIsDrawerOpen, evictItem } = useCart();
-  const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+  const [selectedCategoryKey, setSelectedCategoryKey] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'default' | 'price-asc' | 'price-desc' | 'name'>('default');
   const [outOfStockToast, setOutOfStockToast] = useState<string | null>(null);
 
   // Selected variant for each item on the page: { [itemId]: variantId }
   const [selectedVariants, setSelectedVariants] = useState<Record<string, string>>({});
+  // Local quantity selection for items before adding to cart: { [itemId]: number }
+  const [itemQuantities, setItemQuantities] = useState<Record<string, number>>({});
+
+  const menuSectionRef = useRef<HTMLDivElement>(null);
 
   // Query menu
   const { data, isLoading, error, refetch } = useQuery({
@@ -29,7 +48,7 @@ export function CustomerMenuPage() {
 
   const categories = data || [];
 
-  // Listen for real-time menu stock changes (Stretch Feature)
+  // Real-time menu stock listener
   useEventSource('/events/menu', {
     events: ['menu.updated'],
     onMessage: (event) => {
@@ -45,252 +64,401 @@ export function CustomerMenuPage() {
     onReconnect: () => refetch(),
   });
 
-  // Default initial variants when categories load
+  // Default initial variants and quantities when categories load
   useEffect(() => {
     if (categories.length > 0) {
       const initialMap: Record<string, string> = {};
+      const initialQty: Record<string, number> = {};
       for (const cat of categories) {
         for (const item of cat.items || []) {
           if (item.variants && item.variants.length > 0 && !selectedVariants[item.id]) {
             initialMap[item.id] = item.variants[0].id;
           }
+          if (!itemQuantities[item.id]) {
+            initialQty[item.id] = 1;
+          }
         }
       }
       setSelectedVariants((prev) => ({ ...initialMap, ...prev }));
+      setItemQuantities((prev) => ({ ...initialQty, ...prev }));
     }
   }, [categories]);
 
-  // Filter items
+  // Flatten all items with category info
   const allItems = categories.flatMap((cat) =>
     (cat.items || []).map((item) => ({ ...item, categoryName: cat.name }))
   );
 
-  const filteredItems = allItems.filter((item) => {
-    const matchesCategory = selectedCategoryId === 'all' || item.categoryId === selectedCategoryId;
+  // Category mapping matching reference image categories:
+  // All items | Starters | Main Course | Breads | Rice & Biryani | Desserts
+  const categoryFilters = [
+    { key: 'all', label: 'All items', icon: LayoutGrid },
+    { key: 'starters', label: 'Starters', icon: Flame, matchStr: ['starter', 'appetizer'] },
+    { key: 'main_course', label: 'Main Course', icon: UtensilsCrossed, matchStr: ['curries', 'gravies', 'main course'] },
+    { key: 'breads', label: 'Breads', icon: Layers, matchStr: ['breads', 'naan', 'roti'] },
+    { key: 'biryani', label: 'Rice & Biryani', icon: Sparkles, matchStr: ['biryani', 'rice'] },
+    { key: 'desserts', label: 'Desserts', icon: Coffee, matchStr: ['desserts', 'drinks', 'sweets'] },
+  ];
+
+  // Filter items
+  let filteredItems = allItems.filter((item) => {
+    let matchesCategory = true;
+    if (selectedCategoryKey !== 'all') {
+      const activeFilter = categoryFilters.find((c) => c.key === selectedCategoryKey);
+      if (activeFilter?.matchStr) {
+        const catNameLower = item.categoryName.toLowerCase();
+        matchesCategory = activeFilter.matchStr.some((s) => catNameLower.includes(s));
+      }
+    }
+
     const matchesSearch =
       searchQuery.trim() === '' ||
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.description.toLowerCase().includes(searchQuery.toLowerCase());
+
     return matchesCategory && matchesSearch;
   });
 
+  // Sorting
+  filteredItems = [...filteredItems].sort((a, b) => {
+    const priceA = a.variants[0]?.pricePaise || 0;
+    const priceB = b.variants[0]?.pricePaise || 0;
+    if (sortBy === 'price-asc') return priceA - priceB;
+    if (sortBy === 'price-desc') return priceB - priceA;
+    if (sortBy === 'name') return a.name.localeCompare(b.name);
+    return 0;
+  });
+
+  const scrollToMenu = () => {
+    menuSectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const updateItemLocalQty = (itemId: string, delta: number) => {
+    setItemQuantities((prev) => {
+      const current = prev[itemId] || 1;
+      const next = Math.max(1, Math.min(20, current + delta));
+      return { ...prev, [itemId]: next };
+    });
+  };
+
   return (
-    <div className="min-h-screen pb-28">
+    <div className="min-h-screen bg-background pb-32">
       {/* Toast Banner for Out of Stock notification */}
       {outOfStockToast && (
-        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-md w-[92%] bg-amber-500 text-white px-4 py-3 rounded-2xl shadow-elevated flex items-center gap-3 text-sm font-semibold animate-bounce">
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-50 max-w-md w-[92%] bg-primary text-white px-4 py-3 rounded-2xl shadow-elevated flex items-center gap-3 text-sm font-semibold animate-bounce">
           <AlertTriangle className="w-5 h-5 shrink-0" />
           <span>{outOfStockToast}</span>
         </div>
       )}
 
-      {/* Hero Banner */}
-      <section className="bg-card border-b border-border py-8 px-4 text-center">
-        <div className="max-w-3xl mx-auto">
-          <span className="text-xs font-bold tracking-widest text-primary uppercase font-sans">
-            Crafted Regional Delicacies
-          </span>
-          <h1 className="text-3xl sm:text-4xl font-serif font-bold text-foreground mt-1.5 tracking-tight">
-            Authentic Flavors, Made to Order
+      {/* 1. Cinematic Hero Section — Exact Reference Layout */}
+      <section className="relative overflow-hidden bg-stone-950 text-white min-h-[480px] sm:min-h-[560px] flex items-center justify-start px-6 sm:px-12 lg:px-20">
+        {/* Full-width food photography background with warm restaurant ambiance */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-105"
+          style={{ backgroundImage: `url(${PAGE_BACKGROUNDS.menuHero})` }}
+        />
+        {/* Dark warm gradient overlay for high contrast editorial typography */}
+        <div className="absolute inset-0 bg-gradient-to-r from-stone-950/95 via-stone-950/70 to-stone-950/30" />
+        <div className="absolute inset-0 bg-gradient-to-t from-stone-950/60 via-transparent to-stone-950/40" />
+
+        <div className="relative z-10 max-w-2xl py-12 text-left">
+          {/* Main Heading */}
+          <h1 className="text-4xl sm:text-6xl lg:text-7xl font-sans font-extrabold tracking-tight text-white leading-[1.08]">
+            Delicious Food.<br />
+            <span className="text-primary">Great Moments.</span>
           </h1>
-          <p className="text-sm text-muted mt-2 max-w-xl mx-auto">
-            Choose your favorites, customize portion sizes, and track your freshly cooked order in real-time.
+
+          {/* Subtitle */}
+          <p className="text-base sm:text-lg text-stone-200/90 mt-4 max-w-lg leading-relaxed font-normal">
+            Order your favourites and enjoy a seamless dining experience.
           </p>
 
-          {/* Search Bar */}
-          <div className="mt-6 max-w-md mx-auto relative">
-            <Search className="w-4 h-4 text-muted absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search dishes, curries, biryani..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 bg-background border border-border rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-foreground placeholder:text-muted/60 shadow-sm"
-            />
+          {/* Explore Menu Button */}
+          <div className="mt-8">
+            <button
+              onClick={scrollToMenu}
+              className="inline-flex items-center gap-3 bg-primary hover:bg-primary-hover active:scale-95 text-white font-bold px-8 py-3.5 rounded-full text-base shadow-soft hover:shadow-card transition-all cursor-pointer"
+            >
+              <span>Explore Menu</span>
+              <ArrowRight className="w-5 h-5" />
+            </button>
           </div>
         </div>
       </section>
 
-      {/* Sticky Category Tabs */}
-      <div className="sticky top-16 z-30 bg-background/95 backdrop-blur border-b border-border py-3 px-4">
-        <div className="max-w-6xl mx-auto flex items-center gap-2 overflow-x-auto no-scrollbar">
-          <button
-            onClick={() => setSelectedCategoryId('all')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all select-none min-h-[38px] ${
-              selectedCategoryId === 'all'
-                ? 'bg-foreground text-background shadow-sm'
-                : 'bg-card text-muted hover:text-foreground border border-border'
-            }`}
-          >
-            All Dishes ({allItems.length})
-          </button>
-          {categories.map((cat) => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategoryId(cat.id)}
-              className={`px-4 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all select-none min-h-[38px] ${
-                selectedCategoryId === cat.id
-                  ? 'bg-foreground text-background shadow-sm'
-                  : 'bg-card text-muted hover:text-foreground border border-border'
-              }`}
-            >
-              {cat.name} ({cat.items?.length || 0})
-            </button>
-          ))}
+      {/* 2. Menu Navigation & Filter Section */}
+      <div ref={menuSectionRef} className="max-w-7xl mx-auto px-4 sm:px-6 pt-10">
+        {/* Category Pill Tabs */}
+        <div className="flex items-center gap-2.5 overflow-x-auto pb-4 no-scrollbar">
+          {categoryFilters.map((cat) => {
+            const IconComponent = cat.icon;
+            const isSelected = selectedCategoryKey === cat.key;
+
+            return (
+              <button
+                key={cat.key}
+                onClick={() => setSelectedCategoryKey(cat.key)}
+                className={`inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs sm:text-sm font-bold whitespace-nowrap transition-all duration-200 select-none cursor-pointer ${
+                  isSelected
+                    ? 'bg-primary text-white shadow-soft'
+                    : 'bg-card text-foreground hover:bg-secondary/70 border border-border shadow-soft'
+                }`}
+              >
+                <IconComponent className="w-4 h-4" />
+                <span>{cat.label}</span>
+              </button>
+            );
+          })}
         </div>
-      </div>
 
-      {/* Menu Items Grid */}
-      <main className="max-w-6xl mx-auto px-4 mt-8">
-        {isLoading ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[1, 2, 3, 4, 5, 6].map((n) => (
-              <div key={n} className="bg-card rounded-2xl border border-border p-5 animate-pulse space-y-3">
-                <div className="w-1/3 h-4 bg-secondary rounded" />
-                <div className="w-2/3 h-5 bg-secondary rounded" />
-                <div className="w-full h-12 bg-secondary rounded" />
-                <div className="w-full h-10 bg-secondary rounded-xl" />
-              </div>
-            ))}
+        {/* Search & Sort Bar */}
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* Search Input */}
+          <div className="relative w-full sm:max-w-md">
+            <Search className="w-4 h-4 text-muted absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search for dishes..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-11 pr-4 py-2.5 bg-card border border-border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary text-foreground placeholder:text-muted/70 shadow-soft"
+            />
           </div>
-        ) : error ? (
-          <div className="p-8 text-center text-muted bg-card rounded-2xl border border-border">
-            <p className="text-base font-semibold text-danger">Failed to load restaurant menu</p>
-            <p className="text-xs text-muted mt-1">Please ensure the backend server and database are running.</p>
-            <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-4">
-              Retry
-            </Button>
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="p-12 text-center text-muted bg-card rounded-2xl border border-border">
-            <p className="text-base font-semibold text-foreground">No matching dishes found</p>
-            <p className="text-xs text-muted mt-1">Try adjusting your search query or category filter.</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredItems.map((item) => {
-              const activeVariantId = selectedVariants[item.id] || item.variants[0]?.id;
-              const activeVariant = item.variants.find((v) => v.id === activeVariantId) || item.variants[0];
-              const cartItem = cartLines.find((c) => c.variantId === activeVariant?.id);
 
-              return (
-                <div
-                  key={item.id}
-                  className="bg-card rounded-2xl border border-border p-5 flex flex-col justify-between hover:shadow-card transition-all duration-200 text-left"
-                >
-                  <div>
-                    {/* Header: Dietary & Category */}
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <Badge dietary={item.dietary} />
-                      <span className="text-[11px] font-semibold text-muted uppercase tracking-wider">
-                        {item.categoryName}
-                      </span>
+          {/* Sort Selector */}
+          <div className="flex items-center gap-2 self-end sm:self-auto">
+            <div className="relative">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="appearance-none bg-card border border-border rounded-xl px-4 py-2.5 pr-9 text-xs sm:text-sm font-semibold text-foreground focus:outline-none focus:border-primary shadow-soft cursor-pointer"
+              >
+                <option value="default">Sort</option>
+                <option value="price-asc">Price: Low to High</option>
+                <option value="price-desc">Price: High to Low</option>
+                <option value="name">Name: A to Z</option>
+              </select>
+              <ChevronDown className="w-4 h-4 text-muted absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Food Cards Grid — Matching Reference Image */}
+        <main className="mt-8">
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((n) => (
+                <div key={n} className="bg-card rounded-2xl border border-border p-4 animate-pulse space-y-3">
+                  <div className="w-full h-44 bg-secondary rounded-xl" />
+                  <div className="w-2/3 h-5 bg-secondary rounded" />
+                  <div className="w-full h-8 bg-secondary rounded" />
+                  <div className="w-full h-10 bg-secondary rounded-xl" />
+                </div>
+              ))}
+            </div>
+          ) : error ? (
+            <div className="p-12 text-center text-muted bg-card rounded-2xl border border-border max-w-md mx-auto">
+              <p className="text-base font-bold text-danger">Failed to load restaurant menu</p>
+              <p className="text-xs text-muted mt-1">Please verify the database connection and try again.</p>
+              <button
+                onClick={() => refetch()}
+                className="mt-4 px-4 py-2 bg-primary text-white text-xs font-bold rounded-xl"
+              >
+                Retry
+              </button>
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="p-16 text-center text-muted bg-card rounded-2xl border border-border max-w-md mx-auto">
+              <p className="text-base font-bold text-foreground">No matching dishes found</p>
+              <p className="text-xs text-muted mt-1">Try searching for other regional delicacies.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredItems.map((item) => {
+                const activeVariantId = selectedVariants[item.id] || item.variants[0]?.id;
+                const activeVariant = item.variants.find((v) => v.id === activeVariantId) || item.variants[0];
+                const cartItem = cartLines.find((c) => c.variantId === activeVariant?.id);
+                const localQty = itemQuantities[item.id] || 1;
+                const imageUrl = getDishImageUrl(item);
+                const isVeg = item.dietary === 'VEG' || item.dietary === 'VEGAN';
+                const hasMultipleVariants = item.variants.length > 1;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-card rounded-2xl border border-border/80 overflow-hidden shadow-soft hover:shadow-card transition-all duration-200 flex flex-col justify-between text-left p-3.5"
+                  >
+                    <div>
+                      {/* Dish Image with Indian Veg/Non-Veg Indicator in Top-Right Corner */}
+                      <div className="relative w-full h-44 sm:h-48 rounded-xl overflow-hidden bg-stone-100">
+                        <img
+                          src={imageUrl}
+                          alt={item.name}
+                          loading="lazy"
+                          className="w-full h-full object-cover hover:scale-105 transition-transform duration-500 ease-out"
+                        />
+
+                        {/* Veg / Non-Veg Indicator Icon (Reference standard) */}
+                        <div className="absolute top-2.5 right-2.5 bg-white/95 p-1 rounded-sm shadow-sm flex items-center justify-center">
+                          <div
+                            className={`w-4 h-4 border-2 rounded-sm flex items-center justify-center ${
+                              isVeg ? 'border-emerald-600' : 'border-red-600'
+                            }`}
+                          >
+                            <div
+                              className={`w-2 h-2 rounded-full ${
+                                isVeg ? 'bg-emerald-600' : 'bg-red-600'
+                              }`}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Out of stock overlay */}
+                        {!item.isAvailable && (
+                          <div className="absolute inset-0 bg-stone-900/70 backdrop-blur-xs flex items-center justify-center">
+                            <span className="bg-red-600 text-white text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-wider">
+                              Sold Out
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Content: Title & Short Description */}
+                      <div className="pt-3.5 px-1">
+                        <h3 className="text-base font-bold text-foreground font-sans leading-tight">
+                          {item.name}
+                        </h3>
+                        <p className="text-xs text-muted mt-1 line-clamp-2 leading-relaxed">
+                          {item.description}
+                        </p>
+                      </div>
                     </div>
 
-                    {/* Name & Description */}
-                    <h3 className="text-base font-bold text-foreground leading-snug">{item.name}</h3>
-                    <p className="text-xs text-muted mt-1.5 line-clamp-2 leading-relaxed">
-                      {item.description}
-                    </p>
-                  </div>
-
-                  <div className="mt-5 pt-4 border-t border-border">
-                    {/* Variant Selector (Half / Full / Regular) */}
-                    {item.variants.length > 1 ? (
-                      <div className="mb-3">
-                        <label className="block text-[11px] font-semibold uppercase tracking-wider text-muted mb-1.5">
-                          Select Portion
-                        </label>
-                        <div className="grid grid-cols-2 gap-1.5 p-1 bg-secondary rounded-xl">
-                          {item.variants.map((v) => (
+                    {/* Portions & Action Section */}
+                    <div className="pt-4 px-1">
+                      {/* Case 1: Half and Full Variants Available (Side-by-side selection pills) */}
+                      {hasMultipleVariants ? (
+                        <div className="grid grid-cols-2 gap-2 mb-3">
+                          {item.variants.map((v) => {
+                            const isSelected = activeVariant?.id === v.id;
+                            return (
+                              <button
+                                key={v.id}
+                                type="button"
+                                onClick={() => setSelectedVariants((prev) => ({ ...prev, [item.id]: v.id }))}
+                                className={`p-2 rounded-xl border text-center transition-all cursor-pointer ${
+                                  isSelected
+                                    ? 'border-primary bg-primary-light/40 shadow-xs'
+                                    : 'border-border bg-card hover:bg-secondary/40'
+                                }`}
+                              >
+                                <span className="block text-[11px] font-medium text-muted truncate">
+                                  {v.label}
+                                </span>
+                                <span className="block text-sm font-bold text-foreground font-tabular mt-0.5">
+                                  {formatPaise(v.pricePaise)}
+                                </span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        /* Case 2: Single Variant (Stepper on Left, Price on Right) */
+                        <div className="flex items-center justify-between mb-3 py-1">
+                          {/* Stepper */}
+                          <div className="flex items-center border border-border rounded-xl bg-card">
                             <button
-                              key={v.id}
                               type="button"
-                              onClick={() => setSelectedVariants((prev) => ({ ...prev, [item.id]: v.id }))}
-                              className={`py-1.5 px-2 text-xs font-semibold rounded-lg flex items-center justify-between transition-all ${
-                                activeVariant?.id === v.id
-                                  ? 'bg-card text-foreground shadow-sm font-bold'
-                                  : 'text-muted hover:text-foreground'
-                              }`}
+                              onClick={() => updateItemLocalQty(item.id, -1)}
+                              className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground cursor-pointer"
                             >
-                              <span>{v.label}</span>
-                              <span className="font-tabular text-[11px]">{formatPaise(v.pricePaise)}</span>
+                              <Minus className="w-3.5 h-3.5" />
                             </button>
-                          ))}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="mb-3 flex items-baseline justify-between">
-                        <span className="text-xs font-medium text-muted">Price</span>
-                        <span className="text-base font-bold font-tabular text-foreground">
-                          {formatPaise(activeVariant?.pricePaise || 0)}
-                        </span>
-                      </div>
-                    )}
+                            <span className="w-8 text-center text-xs font-bold font-tabular text-foreground">
+                              {localQty}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateItemLocalQty(item.id, 1)}
+                              className="w-8 h-8 flex items-center justify-center text-muted hover:text-foreground cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
 
-                    {/* Add to Cart / Quantity Stepper */}
-                    {cartItem ? (
-                      <div className="flex items-center justify-between bg-primary-light border border-primary/20 rounded-xl p-1.5">
-                        <span className="text-xs font-bold text-primary px-2">Added to Cart</span>
-                        <div className="flex items-center gap-1.5 bg-white rounded-lg p-0.5 shadow-sm">
-                          <button
-                            onClick={() => addItem(activeVariant, item, -1)}
-                            className="w-7 h-7 flex items-center justify-center text-muted hover:text-danger rounded transition-colors"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="w-6 text-center text-xs font-bold font-tabular text-foreground">
-                            {cartItem.qty}
+                          {/* Price */}
+                          <span className="text-base font-bold font-tabular text-foreground">
+                            {formatPaise(activeVariant?.pricePaise || 0)}
                           </span>
-                          <button
-                            onClick={() => addItem(activeVariant, item, 1)}
-                            disabled={cartItem.qty >= 20}
-                            className="w-7 h-7 flex items-center justify-center text-muted hover:text-foreground rounded transition-colors disabled:opacity-30"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
                         </div>
-                      </div>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        fullWidth
-                        size="md"
-                        disabled={!item.isAvailable || !activeVariant?.isAvailable}
-                        onClick={() => {
-                          if (activeVariant) {
-                            addItem(activeVariant, item, 1);
-                          }
-                        }}
-                        className="gap-2"
-                      >
-                        <Plus className="w-4 h-4" />
-                        <span>Add to Order · {formatPaise(activeVariant?.pricePaise || 0)}</span>
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </main>
+                      )}
 
-      {/* Mobile Sticky Bottom "View Cart · ₹total" Bar */}
+                      {/* Add to Order Button (Matching Reference: Vibrant Orange with Cart Icon) */}
+                      {cartItem ? (
+                        <div className="flex items-center justify-between bg-primary-light border border-primary/30 rounded-xl p-1.5">
+                          <span className="text-xs font-bold text-primary pl-2 flex items-center gap-1.5">
+                            <Check className="w-3.5 h-3.5" /> In Order ({cartItem.qty})
+                          </span>
+                          <div className="flex items-center gap-1 bg-white rounded-lg p-0.5 shadow-xs">
+                            <button
+                              onClick={() => addItem(activeVariant, item, -1)}
+                              className="w-7 h-7 flex items-center justify-center text-muted hover:text-danger rounded cursor-pointer"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </button>
+                            <span className="w-6 text-center text-xs font-bold font-tabular text-foreground">
+                              {cartItem.qty}
+                            </span>
+                            <button
+                              onClick={() => addItem(activeVariant, item, 1)}
+                              disabled={cartItem.qty >= 20}
+                              className="w-7 h-7 flex items-center justify-center text-muted hover:text-foreground rounded cursor-pointer"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={!item.isAvailable || !activeVariant?.isAvailable}
+                          onClick={() => {
+                            if (activeVariant) {
+                              const qtyToAdd = hasMultipleVariants ? 1 : localQty;
+                              addItem(activeVariant, item, qtyToAdd);
+                            }
+                          }}
+                          className="w-full bg-primary hover:bg-primary-hover active:scale-[0.98] disabled:opacity-50 text-white py-2.5 px-4 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-soft hover:shadow transition-all cursor-pointer"
+                        >
+                          <ShoppingBag className="w-4 h-4" />
+                          <span>Add to Order</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </main>
+      </div>
+
+      {/* Floating Bottom Cart Bar for Mobile */}
       {totalItems() > 0 && (
-        <div className="fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur border-t border-border p-3 sm:hidden shadow-elevated">
+        <div className="fixed bottom-0 inset-x-0 z-40 bg-card/95 backdrop-blur-md border-t border-border p-3 sm:hidden shadow-elevated">
           <button
             onClick={() => setIsDrawerOpen(true)}
-            className="w-full bg-primary text-white py-3 px-4 rounded-xl font-bold flex items-center justify-between shadow active:scale-98 transition-transform"
+            className="w-full bg-primary text-white py-3.5 px-5 rounded-2xl font-bold flex items-center justify-between shadow-card active:scale-98 transition-transform cursor-pointer"
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5">
               <ShoppingBag className="w-5 h-5" />
               <span>{totalItems()} {totalItems() === 1 ? 'item' : 'items'} in cart</span>
             </div>
-            <div className="flex items-center gap-1 font-tabular">
+            <div className="flex items-center gap-2 font-tabular">
               <span>View Cart</span>
               <span>·</span>
-              <span className="text-base">{formatPaise(totalPaise())}</span>
+              <span className="text-base font-extrabold">{formatPaise(totalPaise())}</span>
             </div>
           </button>
         </div>

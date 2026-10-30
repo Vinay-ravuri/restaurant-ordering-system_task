@@ -6,23 +6,24 @@ export default {
       colors: {
         background: '#F8F6F1',
         foreground: '#20211F',
+        cream: '#FFFDF9',
         card: {
           DEFAULT: '#FFFFFF',
           foreground: '#20211F',
         },
         primary: {
-          DEFAULT: '#C65D3B', // Terracotta / burnt orange
-          hover: '#B55030',
+          DEFAULT: '#E85D24', // Signature Burnt Orange from reference image
+          hover: '#D24E18',
           foreground: '#FFFFFF',
-          light: '#FBECE7',
+          light: '#FDF1EB',
         },
         secondary: {
-          DEFAULT: '#ECE8DF',
-          hover: '#DFD9CD',
+          DEFAULT: '#F0ECE3',
+          hover: '#E5DFC0',
           foreground: '#20211F',
         },
         accent: {
-          DEFAULT: '#F97316',
+          DEFAULT: '#E85D24',
           foreground: '#FFFFFF',
         },
         muted: {
@@ -30,27 +31,32 @@ export default {
           foreground: '#8E8B85',
           background: '#F0ECE4',
         },
-        border: '#E4DFD5',
+        border: '#E8E4DB',
+        sage: {
+          DEFAULT: '#82947B',
+          light: '#EAF0E8',
+          dark: '#586653',
+        },
+        dark: {
+          bg: '#14161B',
+          card: '#1F222A',
+          border: '#2C303B',
+          muted: '#8A91A0',
+        },
         success: {
-          DEFAULT: '#2E7D32',
-          light: '#E8F5E9',
+          DEFAULT: '#10B981',
+          light: '#D1FAE5',
           foreground: '#FFFFFF',
         },
         warning: {
-          DEFAULT: '#D97706',
+          DEFAULT: '#F59E0B',
           light: '#FEF3C7',
           foreground: '#FFFFFF',
         },
         danger: {
-          DEFAULT: '#DC2626',
+          DEFAULT: '#EF4444',
           light: '#FEE2E2',
           foreground: '#FFFFFF',
-        },
-        sage: {
-          50: '#F4F6F4',
-          100: '#E6EAE5',
-          500: '#5A7363',
-          700: '#3D5043',
         },
       },
       borderRadius: {
@@ -62,9 +68,9 @@ export default {
         sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
       },
       boxShadow: {
-        'soft': '0 2px 10px rgba(32, 33, 31, 0.04), 0 1px 3px rgba(32, 33, 31, 0.02)',
+        'soft': '0 2px 8px rgba(32, 33, 31, 0.04), 0 1px 2px rgba(32, 33, 31, 0.02)',
         'card': '0 4px 20px -2px rgba(32, 33, 31, 0.06), 0 2px 6px -1px rgba(32, 33, 31, 0.03)',
-        'elevated': '0 12px 32px -4px rgba(32, 33, 31, 0.12), 0 4px 12px -2px rgba(32, 33, 31, 0.06)',
+        'elevated': '0 12px 32px -4px rgba(32, 33, 31, 0.10), 0 4px 12px -2px rgba(32, 33, 31, 0.04)',
       },
     },
   },
