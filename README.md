@@ -184,6 +184,3 @@ The test suite covers:
 - Integrated Razorpay / Stripe webhook payment processing
 
 ---
-
-## 🤖 AI Tools Used
-- **Antigravity (Google DeepMind):** Full-stack architecture, code scaffolding, database modeling, responsive UI design system, automated tests, and verification.
